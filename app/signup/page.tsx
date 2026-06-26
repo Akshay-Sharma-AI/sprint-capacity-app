@@ -29,13 +29,12 @@ export default function SignUpPage() {
     const result = await signUp(email, password, fullName)
 
     if (result.success) {
-      toast.success('Account created! You can now sign in.')
-      router.push('/login')
+      toast.success(`Welcome, ${fullName}! You're in.`)
+      router.push('/')
     } else {
       toast.error((result.error as any)?.message || 'Sign up failed')
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   return (
@@ -44,7 +43,7 @@ export default function SignUpPage() {
         <CardHeader className="text-center pb-2">
           <CardTitle className="text-2xl">Create your account</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
-            Free to start — no credit card needed
+            Join your team instantly — no approval needed
           </p>
         </CardHeader>
         <CardContent>
