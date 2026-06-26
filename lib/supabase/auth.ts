@@ -12,7 +12,11 @@ export async function signUp(email: string, password: string, fullName: string) 
       options: {
         data: {
           full_name: fullName,
+          total_hours: 0,
+          allocated_hours: 0,
+          logged_hours: 0,
         },
+        emailRedirectTo: undefined,
       },
     })
 

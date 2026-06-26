@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -21,38 +21,39 @@ export default function LoginPage() {
     setLoading(true)
 
     const result = await signIn(email, password)
-    
+
     if (result.success) {
-      toast.success('Logged in successfully')
+      toast.success('Welcome back!')
       router.push('/')
     } else {
-      toast.error(result.error?.message || 'Login failed')
+      toast.error('Incorrect email or password')
     }
 
     setLoading(false)
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>SprintCapacity</CardTitle>
-          <CardDescription>Sign in to your account</CardDescription>
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center pb-2">
+          <CardTitle className="text-2xl">Welcome back</CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">Sign in to SprintCapacity</p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
+          <form onSubmit={handleLogin} className="space-y-4 mt-2">
+            <div className="space-y-1">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder="jane@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoFocus
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
@@ -63,16 +64,16 @@ export default function LoginPage() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign In'}
+            <Button type="submit" className="w-full mt-2" disabled={loading}>
+              {loading ? 'Signing in…' : 'Sign in'}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
-            Don&apos;t have an account?{' '}
-            <Link href="/signup" className="text-primary hover:underline">
-              Sign up
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            New here?{' '}
+            <Link href="/signup" className="text-primary hover:underline font-medium">
+              Create an account
             </Link>
-          </div>
+          </p>
         </CardContent>
       </Card>
     </div>
