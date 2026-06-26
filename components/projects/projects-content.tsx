@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Plus, Calendar, Users, Zap, MoreHorizontal, FolderKanban, TrendingUp, Trash2, Loader2,
 } from "lucide-react"
@@ -50,11 +51,11 @@ const statusConfig: Record<ProjectStatus, { label: string; className: string }> 
 }
 
 export function ProjectsContent() {
-  const { projects, users, createProject, deleteProject, loading } = useAppContext()
+  const { projects, users, currentUserId, createProject, deleteProject, loading } = useAppContext()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [newProject, setNewProject] = useState({ name: "", description: "" })
+  const [newProject, setNewProject] = useState({ name: "", description: "", leadId: "", status: "active" })
 
   const handleCreate = async () => {
     if (!newProject.name.trim()) { toast.error("Project name is required"); return }
@@ -63,9 +64,9 @@ export function ProjectsContent() {
       await createProject({
         name: newProject.name.trim(),
         description: newProject.description.trim(),
-        status: 'active',
+        status: (newProject.status as any) || 'active',
         owner: '',
-        ownerId: '',
+        ownerId: newProject.leadId || currentUserId || '',
         startDate: '',
         endDate: '',
         currentSprint: '',
@@ -74,7 +75,7 @@ export function ProjectsContent() {
       })
       toast.success(`Project "${newProject.name}" created`)
       setOpen(false)
-      setNewProject({ name: "", description: "" })
+      setNewProject({ name: "", description: "", leadId: "", status: "active" })
     } catch {
       toast.error("Failed to create project")
     } finally {
@@ -238,10 +239,31 @@ export function ProjectsContent() {
               <Textarea
                 id="project-desc"
                 placeholder="What is this project about?"
-                rows={3}
+                rows={2}
                 value={newProject.description}
                 onChange={e => setNewProject({ ...newProject, description: e.target.value })}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Project Lead</Label>
+              <Select value={newProject.leadId} onValueChange={v => setNewProject({ ...newProject, leadId: v })}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select a lead (optional)" /></SelectTrigger>
+                <SelectContent>
+                  {users.map(u => (
+                    <SelectItem key={u.id} value={u.id} className="text-sm">{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select value={newProject.status} onValueChange={v => setNewProject({ ...newProject, status: v })}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="planning" className="text-sm">Planning</SelectItem>
+                  <SelectItem value="active" className="text-sm">Active</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
