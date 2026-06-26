@@ -8,24 +8,23 @@ import {
   ListTodo,
   Zap,
   SquareKanban,
-  Users,
-  BarChart3,
   Settings,
   CheckSquare,
   MessageSquare,
   ChevronLeft,
   ChevronRight,
   Gauge,
-  UserCircle,
+  LogIn,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { createClient } from "@/lib/supabase/client"
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -33,18 +32,68 @@ const navItems = [
   { href: "/backlog", label: "Backlog", icon: ListTodo },
   { href: "/active-sprint", label: "Active Sprint", icon: Zap },
   { href: "/sprint-board", label: "Sprint Board", icon: SquareKanban },
-  { href: "/capacity", label: "Capacity Planning", icon: Gauge },
-  { href: "/workload", label: "Team Workload", icon: Users },
+  { href: "/capacity", label: "Capacity", icon: Gauge },
   { href: "/my-tasks", label: "My Tasks", icon: CheckSquare },
   { href: "/daily-updates", label: "Daily Updates", icon: MessageSquare },
-  { href: "/reports", label: "Reports", icon: BarChart3 },
-  { href: "/profile", label: "Profile", icon: UserCircle },
-  { href: "/settings", label: "Settings", icon: Settings },
 ]
+
+interface UserProfile {
+  full_name: string | null
+  email: string | null
+  role: string | null
+}
+
+function getInitials(name: string | null, email: string | null): string {
+  if (name) {
+    const parts = name.trim().split(" ")
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    }
+    return name.slice(0, 2).toUpperCase()
+  }
+  if (email) {
+    return email.slice(0, 2).toUpperCase()
+  }
+  return "??"
+}
 
 export function AppSidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          setProfile(null)
+          setLoading(false)
+          return
+        }
+        const { data } = await supabase
+          .from("users")
+          .select("full_name, email, role")
+          .eq("id", user.id)
+          .single()
+        if (data) {
+          setProfile(data)
+        } else {
+          setProfile({ full_name: null, email: user.email ?? null, role: null })
+        }
+      } catch {
+        setProfile(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadProfile()
+  }, [])
+
+  const displayName = profile?.full_name || profile?.email || null
+  const initials = getInitials(profile?.full_name ?? null, profile?.email ?? null)
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -108,16 +157,40 @@ export function AppSidebar() {
 
         {/* User + collapse */}
         <div className="border-t border-sidebar-border">
-          {!collapsed && (
-            <div className="flex items-center gap-3 px-4 py-3">
-              <div className="flex items-center justify-center size-7 rounded-full bg-primary text-primary-foreground text-xs font-semibold shrink-0">
-                SC
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-sidebar-foreground truncate">Sarah Chen</p>
-                <p className="text-xs text-sidebar-foreground/50 truncate">Sprint Manager</p>
-              </div>
-            </div>
+          {!loading && (
+            <>
+              {profile ? (
+                !collapsed && (
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <div className="flex items-center justify-center size-7 rounded-full bg-primary text-primary-foreground text-xs font-semibold shrink-0">
+                      {initials}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-sidebar-foreground truncate">
+                        {displayName}
+                      </p>
+                      {profile.role && (
+                        <p className="text-xs text-sidebar-foreground/50 truncate capitalize">
+                          {profile.role}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+              ) : (
+                !collapsed && (
+                  <div className="px-4 py-3">
+                    <Link
+                      href="/login"
+                      className="flex items-center gap-2 text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
+                    >
+                      <LogIn className="size-3.5 shrink-0" />
+                      <span>Sign In</span>
+                    </Link>
+                  </div>
+                )
+              )}
+            </>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
