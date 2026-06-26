@@ -172,18 +172,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setLoading(false); return }
-    setCurrentUserId(user.id)
 
-    const { data: memberRow } = await supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', user.id)
+    // Load current user if logged in (optional — app is publicly viewable)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) setCurrentUserId(user.id)
+
+    // Get the shared workspace (first one — single-tenant team setup)
+    const { data: workspaceRow } = await supabase
+      .from('workspaces')
+      .select('id')
+      .limit(1)
       .single()
 
-    if (!memberRow) { setLoading(false); return }
-    const wid = memberRow.workspace_id
+    if (!workspaceRow) { setLoading(false); return }
+    const wid = workspaceRow.id
     setWorkspaceId(wid)
 
     const [usersRes, projectsRes, sprintsRes, tasksRes, capsRes, updatesRes] =
