@@ -233,8 +233,8 @@ export function DailyUpdatesContent() {
       setNextPlan("")
       setBlockers("")
       setEmojiMood("good")
-    } catch {
-      toast.error("Failed to submit update. Please try again.")
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to submit update. Please try again.")
     } finally {
       setSubmitting(false)
     }

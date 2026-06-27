@@ -96,8 +96,8 @@ function TaskRow({ task, projects, sprints, updateTask }: TaskRowProps) {
     try {
       await updateTask(task.id, { status: newStatus })
       toast.success(`Status updated to "${statusConfig[newStatus].label}"`)
-    } catch {
-      toast.error("Failed to update status")
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update status")
     }
   }
 
@@ -114,13 +114,14 @@ function TaskRow({ task, projects, sprints, updateTask }: TaskRowProps) {
       await updateTask(task.id, {
         loggedHours: newLogged,
         remainingHours: newRemaining,
+        ...(notes.trim() ? { description: notes.trim() } : {}),
       })
       toast.success(`Logged ${h}h on "${task.title.substring(0, 30)}"`)
       setHoursWorked("")
       setNotes("")
       setLogOpen(false)
-    } catch {
-      toast.error("Failed to log hours")
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to log hours")
     } finally {
       setSaving(false)
     }

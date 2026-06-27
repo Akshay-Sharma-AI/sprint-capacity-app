@@ -151,6 +151,7 @@ function mapDailyUpdate(row: any): DailyUpdate {
     hoursLogged: 0,
     mood: row.mood === 'great' || row.mood === 'good' ? 'good'
         : row.mood === 'challenging' || row.mood === 'struggling' ? 'stuck'
+        : row.mood === 'overloaded' ? 'overloaded'
         : 'neutral',
   }
 }
@@ -381,7 +382,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sprint_id: activeSprintId,
       user_id: update.userId || currentUserId,
       date: update.date,
-      mood: update.mood === 'good' ? 'good' : update.mood === 'stuck' ? 'challenging' : 'okay',
+      mood: update.mood === 'good' ? 'good' : update.mood === 'stuck' ? 'challenging' : update.mood === 'overloaded' ? 'overloaded' : 'okay',
       yesterday_completed: update.workedOn,
       today_planned: update.nextPlan,
       blockers: update.blockers,
@@ -395,7 +396,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       yesterday_completed: updates.workedOn,
       today_planned: updates.nextPlan,
       blockers: updates.blockers,
-      mood: updates.mood === 'good' ? 'good' : updates.mood === 'stuck' ? 'challenging' : 'okay',
+      mood: updates.mood === 'good' ? 'good' : updates.mood === 'stuck' ? 'challenging' : updates.mood === 'overloaded' ? 'overloaded' : 'okay',
     }).eq('id', id).select().single()
     if (error) throw error
     setDailyUpdates(prev => prev.map(u => u.id === id ? mapDailyUpdate(data) : u))

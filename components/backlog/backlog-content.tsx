@@ -106,10 +106,12 @@ export function BacklogContent() {
     sprints,
     projects,
     activeSprintId,
+    setActiveSprintId,
     currentUserId,
     createTask,
     updateTask,
     deleteTask,
+    createSprint,
   } = useAppContext()
 
   const [search, setSearch] = useState("")
@@ -124,6 +126,11 @@ export function BacklogContent() {
   // Delete confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  // Create sprint dialog
+  const [sprintOpen, setSprintOpen] = useState(false)
+  const [sprintForm, setSprintForm] = useState({ name: "", goal: "", startDate: "", endDate: "", projectId: "" })
+  const [creatingSprint, setCreatingSprint] = useState(false)
 
   // ── Derived data ───────────────────────────────────────────────────────────
 
@@ -212,6 +219,34 @@ export function BacklogContent() {
     } finally {
       setDeleting(false)
       setDeleteId(null)
+    }
+  }
+
+  const handleCreateSprint = async () => {
+    if (!sprintForm.name.trim()) { toast.error("Sprint name is required"); return }
+    if (!sprintForm.startDate || !sprintForm.endDate) { toast.error("Start and end dates are required"); return }
+    if (!currentUserId) { toast.error("Sign in to create a sprint"); return }
+    const pid = sprintForm.projectId || defaultProjectId
+    if (!pid) { toast.error("Create a project first before creating a sprint"); return }
+    setCreatingSprint(true)
+    try {
+      await createSprint({
+        projectId: pid,
+        name: sprintForm.name.trim(),
+        goal: sprintForm.goal.trim(),
+        startDate: sprintForm.startDate,
+        endDate: sprintForm.endDate,
+        status: "active",
+        committedStoryPoints: 0,
+        completedStoryPoints: 0,
+      })
+      toast.success(`Sprint "${sprintForm.name}" created`)
+      setSprintOpen(false)
+      setSprintForm({ name: "", goal: "", startDate: "", endDate: "", projectId: "" })
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to create sprint")
+    } finally {
+      setCreatingSprint(false)
     }
   }
 
@@ -353,10 +388,19 @@ export function BacklogContent() {
               </Select>
             </div>
 
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="size-4 mr-1" />
-              Create Task
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => {
+                if (!currentUserId) { toast.error("Sign in to create a sprint"); return }
+                setSprintOpen(true)
+              }}>
+                <Zap className="size-4 mr-1" />
+                New Sprint
+              </Button>
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="size-4 mr-1" />
+                Create Task
+              </Button>
+            </div>
           </div>
 
           {/* Sprint Backlog section */}
@@ -384,12 +428,16 @@ export function BacklogContent() {
             </div>
 
             {!activeSprintId ? (
-              <div className="px-4 py-10 text-center">
+              <div className="px-4 py-10 text-center space-y-3">
                 <Package className="size-8 mx-auto mb-2 text-muted-foreground/40" />
                 <p className="text-sm font-medium text-muted-foreground">No active sprint</p>
-                <p className="text-xs text-muted-foreground/70 mt-1">
-                  Start a sprint to see its tasks here
+                <p className="text-xs text-muted-foreground/70">
+                  Create a sprint to start planning your team&apos;s work
                 </p>
+                <Button size="sm" variant="outline" onClick={() => setSprintOpen(true)}>
+                  <Zap className="size-3.5 mr-1.5" />
+                  Create Sprint
+                </Button>
               </div>
             ) : filteredSprint.length === 0 ? (
               <div className="px-4 py-10 text-center">
@@ -593,6 +641,73 @@ export function BacklogContent() {
             </Button>
             <Button onClick={handleCreate} disabled={creating}>
               {creating ? "Creating..." : "Create Task"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Sprint Dialog */}
+      <Dialog open={sprintOpen} onOpenChange={(open) => { setSprintOpen(open); if (!open) setSprintForm({ name: "", goal: "", startDate: "", endDate: "", projectId: "" }) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>New Sprint</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="sprint-name">Sprint Name <span className="text-destructive">*</span></Label>
+              <Input
+                id="sprint-name"
+                placeholder="e.g. Sprint 4"
+                value={sprintForm.name}
+                onChange={e => setSprintForm({ ...sprintForm, name: e.target.value })}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="sprint-goal">Goal</Label>
+              <Input
+                id="sprint-goal"
+                placeholder="What should the team achieve?"
+                value={sprintForm.goal}
+                onChange={e => setSprintForm({ ...sprintForm, goal: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="sprint-start">Start Date <span className="text-destructive">*</span></Label>
+                <Input
+                  id="sprint-start"
+                  type="date"
+                  value={sprintForm.startDate}
+                  onChange={e => setSprintForm({ ...sprintForm, startDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="sprint-end">End Date <span className="text-destructive">*</span></Label>
+                <Input
+                  id="sprint-end"
+                  type="date"
+                  value={sprintForm.endDate}
+                  onChange={e => setSprintForm({ ...sprintForm, endDate: e.target.value })}
+                />
+              </div>
+            </div>
+            {projects.length > 1 && (
+              <div className="space-y-1.5">
+                <Label>Project</Label>
+                <Select value={sprintForm.projectId || defaultProjectId} onValueChange={v => setSprintForm({ ...sprintForm, projectId: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
+                  <SelectContent>
+                    {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSprintOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateSprint} disabled={creatingSprint}>
+              {creatingSprint ? "Creating..." : "Create Sprint"}
             </Button>
           </DialogFooter>
         </DialogContent>

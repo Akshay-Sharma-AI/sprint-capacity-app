@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -58,6 +59,7 @@ const statusGroups = [
 export function ActiveSprintContent() {
   const { sprints, tasks, users, capacities, activeSprintId, updateTask, updateSprint } =
     useAppContext()
+  const router = useRouter()
 
   const [completingSprintId, setCompletingSprintId] = useState<string | null>(null)
   const [resolvingTaskId, setResolvingTaskId] = useState<string | null>(null)
@@ -90,7 +92,7 @@ export function ActiveSprintContent() {
               start an existing sprint from the sprint planning view.
             </p>
           </div>
-          <Button variant="outline" onClick={() => toast.info("Go to Backlog to create a sprint")}>
+          <Button variant="outline" onClick={() => router.push('/backlog')}>
             Go to Backlog
           </Button>
         </div>

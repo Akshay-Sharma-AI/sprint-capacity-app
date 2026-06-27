@@ -134,8 +134,8 @@ export function CapacityContent() {
       await updateCapacity(userId, selectedSprintId, { totalAvailableHours: parsed })
       setEdits(prev => { const n = { ...prev }; delete n[userId]; return n })
       toast.success("Capacity updated")
-    } catch {
-      toast.error("Failed to update capacity")
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update capacity")
     } finally {
       setSaving(prev => ({ ...prev, [userId]: false }))
     }
