@@ -249,20 +249,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [loadData])
 
+  // ── Auth helper — always checks live Supabase session, not stale state ──────
+
+  const requireAuth = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const uid = session?.user?.id
+    if (!uid) throw new Error("You must be signed in. Please log in and try again.")
+    // Fix stale state while we're here
+    if (!currentUserId) setCurrentUserId(uid)
+    // Ensure workspaceId is loaded
+    let wid = workspaceId
+    if (!wid) {
+      const { data } = await supabase.from('workspaces').select('id').limit(1).single()
+      if (!data) throw new Error("No workspace found — try refreshing the page.")
+      wid = data.id
+      setWorkspaceId(wid)
+    }
+    return { uid, wid }
+  }, [workspaceId, currentUserId])
+
   // ── Projects ──────────────────────────────────────────────────────────────
 
   const createProject = useCallback(async (project: Omit<Project, "id">) => {
-    if (!workspaceId || !currentUserId) throw new Error("You must be signed in to create a project")
+    const { uid, wid } = await requireAuth()
     const { data, error } = await supabase.from('projects').insert({
-      workspace_id: workspaceId,
+      workspace_id: wid,
       name: project.name,
       description: project.description || '',
-      lead_id: currentUserId,
+      lead_id: uid,
       status: project.status || 'active',
     }).select().single()
     if (error) throw error
     setProjects(prev => [...prev, mapProject(data, users, sprints, tasks)])
-  }, [workspaceId, currentUserId, users, sprints, tasks])
+  }, [requireAuth, users, sprints, tasks])
 
   const updateProject = useCallback(async (id: string, updates: Partial<Project>) => {
     const { data, error } = await supabase.from('projects')
@@ -283,9 +302,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ── Sprints ───────────────────────────────────────────────────────────────
 
   const createSprint = useCallback(async (sprint: Omit<Sprint, "id">) => {
-    if (!workspaceId || !currentUserId) throw new Error("You must be signed in to create a sprint")
+    const { wid } = await requireAuth()
     const { data, error } = await supabase.from('sprints').insert({
-      workspace_id: workspaceId,
+      workspace_id: wid,
       project_id: sprint.projectId,
       name: sprint.name,
       goal: sprint.goal || '',
@@ -298,9 +317,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error
     const mapped = mapSprint(data)
     setSprints(prev => [mapped, ...prev])
-    // Auto-activate the new sprint if created as active
     if (mapped.status === 'active') setActiveSprintId(mapped.id)
-  }, [workspaceId, currentUserId])
+  }, [requireAuth])
 
   const updateSprint = useCallback(async (id: string, updates: Partial<Sprint>) => {
     const { data, error } = await supabase.from('sprints').update({
@@ -326,9 +344,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ── Tasks ─────────────────────────────────────────────────────────────────
 
   const createTask = useCallback(async (task: Omit<Task, "id">) => {
-    if (!workspaceId || !currentUserId) throw new Error("You must be signed in to create a task")
+    const { uid, wid } = await requireAuth()
     const { data, error } = await supabase.from('tasks').insert({
-      workspace_id: workspaceId,
+      workspace_id: wid,
       project_id: task.projectId,
       sprint_id: task.sprintId || null,
       title: task.title,
@@ -343,11 +361,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       remaining_hours: task.estimatedHours || 0,
       due_date: task.dueDate || null,
       is_blocked: false,
-      created_by: currentUserId,
+      created_by: uid,
     }).select().single()
     if (error) throw error
     setTasks(prev => [mapTask(data), ...prev])
-  }, [workspaceId, currentUserId])
+  }, [requireAuth])
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     const { data, error } = await supabase.from('tasks').update({
@@ -407,11 +425,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ── Daily Updates ─────────────────────────────────────────────────────────
 
   const createDailyUpdate = useCallback(async (update: Omit<DailyUpdate, "id">) => {
-    if (!workspaceId || !currentUserId || !activeSprintId) throw new Error("You must be signed in and have an active sprint to post standup")
+    const { uid, wid } = await requireAuth()
+    if (!activeSprintId) throw new Error("No active sprint — create a sprint first")
     const { data, error } = await supabase.from('daily_updates').insert({
-      workspace_id: workspaceId,
+      workspace_id: wid,
       sprint_id: activeSprintId,
-      user_id: update.userId || currentUserId,
+      user_id: update.userId || uid,
       date: update.date,
       mood: update.mood === 'good' ? 'good' : update.mood === 'stuck' ? 'challenging' : update.mood === 'overloaded' ? 'overloaded' : 'okay',
       yesterday_completed: update.workedOn,
@@ -420,7 +439,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }).select().single()
     if (error) throw error
     setDailyUpdates(prev => [mapDailyUpdate(data), ...prev])
-  }, [workspaceId, currentUserId, activeSprintId])
+  }, [requireAuth, activeSprintId])
 
   const updateDailyUpdate = useCallback(async (id: string, updates: Partial<DailyUpdate>) => {
     const { data, error } = await supabase.from('daily_updates').update({
