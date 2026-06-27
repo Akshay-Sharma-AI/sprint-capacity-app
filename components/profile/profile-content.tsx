@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,329 +9,315 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import { users } from "@/lib/mock-data"
-import { Check, Mail, Clock, Edit2, Save, X } from "lucide-react"
+import { useAppContext } from "@/context/app-context"
+import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import {
+  Edit2, Save, X, LogOut, Loader2, Clock, ShieldCheck, Mail, User,
+  KeyRound, CheckCircle2, AlertCircle,
+} from "lucide-react"
 
-// Current logged-in user (Sarah Chen - u1)
-const CURRENT_USER_ID = "u1"
-const currentUser = users.find((u) => u.id === CURRENT_USER_ID)!
+const roleColors: Record<string, string> = {
+  admin: "bg-destructive/10 text-destructive border-destructive/30",
+  manager: "bg-primary/10 text-primary border-primary/30",
+  member: "bg-muted text-muted-foreground border-border",
+}
+
+const statusColors: Record<string, string> = {
+  available: "bg-green-500/10 text-green-700 border-green-500/30",
+  partial: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30",
+  overloaded: "bg-red-500/10 text-red-700 border-red-500/30",
+  "on-leave": "bg-muted text-muted-foreground border-border",
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
+      <p className="text-sm">{value || '—'}</p>
+    </div>
+  )
+}
 
 export function ProfileContent() {
+  const { users, currentUserId, refresh } = useAppContext()
+  const supabase = createClient()
+  const router = useRouter()
+
+  const currentUser = users.find(u => u.id === currentUserId)
+
   const [isEditing, setIsEditing] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [formData, setFormData] = useState({
-    name: currentUser.name,
-    email: currentUser.email,
-    role: currentUser.role,
-    team: currentUser.team,
-    dailyCapacityHours: currentUser.dailyCapacityHours.toString(),
-  })
+  const [saving, setSaving] = useState(false)
+  const [name, setName] = useState("")
 
-  const handleSave = async () => {
-    setIsSaving(true)
-    // Simulate save
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsSaving(false)
-    setIsEditing(false)
-    toast.success("Profile updated successfully")
+  const [passwords, setPasswords] = useState({ new: "", confirm: "" })
+  const [changingPw, setChangingPw] = useState(false)
+  const [showPwForm, setShowPwForm] = useState(false)
+
+  useEffect(() => {
+    if (currentUser) setName(currentUser.name)
+  }, [currentUser])
+
+  const initials = name
+    .split(' ')
+    .filter(Boolean)
+    .map(n => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || '??'
+
+  const handleSaveName = async () => {
+    if (!currentUserId || !name.trim()) return
+    setSaving(true)
+    try {
+      const { error } = await supabase.from('users').update({ full_name: name.trim() }).eq('id', currentUserId)
+      if (error) throw error
+      await refresh()
+      toast.success("Name updated successfully")
+      setIsEditing(false)
+    } catch {
+      toast.error("Failed to update name")
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleCancel = () => {
-    setFormData({
-      name: currentUser.name,
-      email: currentUser.email,
-      role: currentUser.role,
-      team: currentUser.team,
-      dailyCapacityHours: currentUser.dailyCapacityHours.toString(),
-    })
-    setIsEditing(false)
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (passwords.new.length < 6) { toast.error("Password must be at least 6 characters"); return }
+    if (passwords.new !== passwords.confirm) { toast.error("Passwords don't match"); return }
+    setChangingPw(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ password: passwords.new })
+      if (error) throw error
+      toast.success("Password updated!")
+      setPasswords({ new: "", confirm: "" })
+      setShowPwForm(false)
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update password")
+    } finally {
+      setChangingPw(false)
+    }
   }
 
-  const roleColors: Record<string, string> = {
-    admin: "bg-destructive/10 text-destructive border-destructive/30",
-    manager: "bg-primary/10 text-primary border-primary/30",
-    member: "bg-muted text-muted-foreground border-border",
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
   }
 
-  const availabilityColors: Record<string, string> = {
-    available: "bg-success/10 text-success border-success/30",
-    partial: "bg-warning/10 text-warning-foreground border-warning/30",
-    overloaded: "bg-destructive/10 text-destructive border-destructive/30",
-    "on-leave": "bg-muted text-muted-foreground border-border",
+  if (!currentUserId) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-6">
+        <User className="size-10 text-muted-foreground/40" />
+        <p className="text-sm font-medium text-muted-foreground">You're not signed in</p>
+        <Button size="sm" onClick={() => router.push('/login')}>Sign in to view profile</Button>
+      </div>
+    )
   }
 
   return (
-    <ScrollArea className="h-full">
-      <div className="p-6 space-y-6 max-w-4xl">
-        {/* Profile Header Card */}
-        <Card className="border-border">
-          <CardHeader>
-            <CardTitle>My Profile</CardTitle>
-            <CardDescription>View and manage your personal information</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Avatar Section */}
-            <div className="flex items-start gap-6">
-              <Avatar className="size-24 border-2 border-primary/30">
-                <AvatarFallback className="text-lg font-semibold bg-primary/10">
-                  {currentUser.initials}
+    <ScrollArea className="flex-1">
+      <div className="p-6 max-w-3xl space-y-6">
+
+        {/* Header card */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-5">
+              <Avatar className="size-16 border-2 border-primary/20 shrink-0">
+                <AvatarFallback className="text-xl font-bold bg-primary/10 text-primary">
+                  {initials}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1 space-y-3">
-                <div>
-                  <h3 className="text-xl font-semibold">{currentUser.name}</h3>
-                  <p className="text-sm text-muted-foreground">{currentUser.email}</p>
+
+              <div className="flex-1 min-w-0 space-y-2">
+                {isEditing ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      className="h-8 text-sm max-w-[240px] font-semibold"
+                      autoFocus
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setIsEditing(false); setName(currentUser?.name || "") } }}
+                    />
+                    <Button size="sm" className="h-8" onClick={handleSaveName} disabled={saving}>
+                      {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8" onClick={() => { setIsEditing(false); setName(currentUser?.name || "") }}>
+                      <X className="size-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold">{currentUser?.name || 'Unknown'}</h2>
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      title="Edit name"
+                    >
+                      <Edit2 className="size-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Mail className="size-3.5" />
+                  {currentUser?.email || '—'}
                 </div>
-                <div className="flex gap-2">
-                  <Badge variant="outline" className={roleColors[currentUser.role]}>
-                    {currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1)}
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className={`text-xs capitalize ${roleColors[currentUser?.role || 'member']}`}>
+                    {currentUser?.role || 'member'}
                   </Badge>
-                  <Badge variant="outline" className="bg-secondary/10 text-secondary-foreground border-secondary/30">
-                    {currentUser.team} Team
-                  </Badge>
-                  <Badge variant="outline" className={availabilityColors[currentUser.availabilityStatus]}>
-                    {currentUser.availabilityStatus === "on-leave"
-                      ? "On Leave"
-                      : currentUser.availabilityStatus.charAt(0).toUpperCase() + currentUser.availabilityStatus.slice(1)}
+                  <Badge variant="outline" className={`text-xs capitalize ${statusColors[currentUser?.availabilityStatus || 'available']}`}>
+                    {currentUser?.availabilityStatus === 'on-leave' ? 'On Leave' : (currentUser?.availabilityStatus || 'available')}
                   </Badge>
                 </div>
               </div>
-              <Button
-                onClick={() => setIsEditing(!isEditing)}
-                variant={isEditing ? "secondary" : "outline"}
-                size="sm"
-                className="gap-1.5"
-              >
-                {isEditing ? (
-                  <>
-                    <X className="size-3" />
-                    Cancel
-                  </>
-                ) : (
-                  <>
-                    <Edit2 className="size-3" />
-                    Edit
-                  </>
-                )}
+
+              <Button variant="outline" size="sm" onClick={handleSignOut} className="shrink-0">
+                <LogOut className="size-3.5 mr-1.5" />
+                Sign Out
               </Button>
             </div>
-
-            {isEditing && (
-              <>
-                {/* Edit Form */}
-                <div className="pt-6 border-t border-border space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name</Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Your full name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="your.email@company.com"
-                        disabled
-                      />
-                      <p className="text-xs text-muted-foreground">Email cannot be changed</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="role">Role</Label>
-                      <Input id="role" value={formData.role} placeholder="Your role" disabled />
-                      <p className="text-xs text-muted-foreground">Contact admin to change role</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="team">Team</Label>
-                      <Input id="team" value={formData.team} placeholder="Your team" disabled />
-                      <p className="text-xs text-muted-foreground">Contact admin to change team</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="capacity">Daily Capacity (hours)</Label>
-                      <Input
-                        id="capacity"
-                        type="number"
-                        value={formData.dailyCapacityHours}
-                        onChange={(e) => setFormData({ ...formData, dailyCapacityHours: e.target.value })}
-                        min="1"
-                        max="12"
-                        placeholder="8"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 pt-4 justify-end">
-                    <Button
-                      variant="outline"
-                      onClick={handleCancel}
-                      disabled={isSaving}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleSave}
-                      disabled={isSaving}
-                      className="gap-1.5"
-                    >
-                      {isSaving ? (
-                        <>
-                          <div className="animate-spin size-3 border-2 border-primary-foreground border-t-transparent rounded-full" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="size-3" />
-                          Save Changes
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </>
-            )}
           </CardContent>
         </Card>
 
-        {/* Tabs for Additional Info */}
-        <Tabs defaultValue="details" className="w-full">
-          <TabsList>
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
-            <TabsTrigger value="preferences">Preferences</TabsTrigger>
+        {/* Tabs */}
+        <Tabs defaultValue="details">
+          <TabsList className="h-8">
+            <TabsTrigger value="details" className="text-xs gap-1.5">
+              <User className="size-3" />Details
+            </TabsTrigger>
+            <TabsTrigger value="security" className="text-xs gap-1.5">
+              <ShieldCheck className="size-3" />Security
+            </TabsTrigger>
           </TabsList>
 
-          {/* Details Tab */}
+          {/* Details tab */}
           <TabsContent value="details">
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-base">Account Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">User ID</p>
-                    <p className="text-sm font-mono">{currentUser.id}</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</p>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={roleColors[currentUser.role]}>
-                        {currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1)}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Team</p>
-                    <p className="text-sm">{currentUser.team}</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Daily Capacity</p>
-                    <div className="flex items-center gap-2">
-                      <Clock className="size-4 text-muted-foreground" />
-                      <p className="text-sm">{currentUser.dailyCapacityHours} hours</p>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Availability</p>
-                    <Badge variant="outline" className={availabilityColors[currentUser.availabilityStatus]}>
-                      {currentUser.availabilityStatus === "on-leave"
-                        ? "On Leave"
-                        : currentUser.availabilityStatus.charAt(0).toUpperCase() + currentUser.availabilityStatus.slice(1)}
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Activity Tab */}
-          <TabsContent value="activity">
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-base">Recent Activity</CardTitle>
-                <CardDescription>Your recent actions in SprintCapacity</CardDescription>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">Account Details</CardTitle>
+                <CardDescription className="text-xs">Your profile information</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {[
-                    { action: "Logged 6 hours on Task", task: "Implement API endpoints", time: "2 hours ago" },
-                    { action: "Updated status for", task: "Dashboard Design", time: "4 hours ago" },
-                    { action: "Created new task", task: "Sprint Retrospective", time: "1 day ago" },
-                    { action: "Marked as done", task: "Database Optimization", time: "2 days ago" },
-                    { action: "Added comment on", task: "Performance Issues", time: "3 days ago" },
-                  ].map((item, idx) => (
-                    <div key={idx} className="flex items-start gap-3 pb-4 border-b border-border last:border-0">
-                      <div className="flex items-center justify-center size-8 rounded-full bg-primary/10 mt-0.5">
-                        <Check className="size-4 text-primary" />
-                      </div>
-                      <div className="flex-1 space-y-0.5">
-                        <p className="text-sm">
-                          {item.action} <span className="font-medium">{item.task}</span>
-                        </p>
-                        <p className="text-xs text-muted-foreground">{item.time}</p>
-                      </div>
+                <div className="grid sm:grid-cols-2 gap-5">
+                  <InfoRow label="Full Name" value={currentUser?.name || '—'} />
+                  <InfoRow label="Email" value={currentUser?.email || '—'} />
+                  <InfoRow label="Role" value={currentUser?.role ? (currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1)) : 'Member'} />
+                  <InfoRow label="Availability" value={currentUser?.availabilityStatus === 'on-leave' ? 'On Leave' : (currentUser?.availabilityStatus ? (currentUser.availabilityStatus.charAt(0).toUpperCase() + currentUser.availabilityStatus.slice(1)) : 'Available')} />
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Daily Capacity</p>
+                    <div className="flex items-center gap-1.5 text-sm">
+                      <Clock className="size-3.5 text-muted-foreground" />
+                      {currentUser?.dailyCapacityHours ?? 8} hours
                     </div>
-                  ))}
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">User ID</p>
+                    <p className="text-xs font-mono text-muted-foreground truncate">{currentUserId}</p>
+                  </div>
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground flex-1">
+                    To change your display name, click the edit icon next to your name above.
+                  </p>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Preferences Tab */}
-          <TabsContent value="preferences">
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-base">Preferences</CardTitle>
-                <CardDescription>Customize your experience</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border">
-                    <div>
-                      <p className="text-sm font-medium">Email Notifications</p>
-                      <p className="text-xs text-muted-foreground">Receive updates on task assignments</p>
+          {/* Security tab */}
+          <TabsContent value="security">
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">Password</CardTitle>
+                  <CardDescription className="text-xs">Keep your account secure with a strong password</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!showPwForm ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <KeyRound className="size-4" />
+                        Password last changed: unknown
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => setShowPwForm(true)}>
+                        Change Password
+                      </Button>
                     </div>
-                    <input type="checkbox" defaultChecked className="w-4 h-4" />
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border">
-                    <div>
-                      <p className="text-sm font-medium">Daily Summary</p>
-                      <p className="text-xs text-muted-foreground">Get daily digest of sprint updates</p>
-                    </div>
-                    <input type="checkbox" defaultChecked className="w-4 h-4" />
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border">
-                    <div>
-                      <p className="text-sm font-medium">Comment Notifications</p>
-                      <p className="text-xs text-muted-foreground">Get notified when someone comments</p>
-                    </div>
-                    <input type="checkbox" defaultChecked className="w-4 h-4" />
-                  </div>
-                </div>
+                  ) : (
+                    <form onSubmit={handleChangePassword} className="space-y-4">
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">New Password</Label>
+                          <Input
+                            type="password"
+                            placeholder="Min 6 characters"
+                            value={passwords.new}
+                            onChange={e => setPasswords({ ...passwords, new: e.target.value })}
+                            className="h-8 text-sm"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Confirm Password</Label>
+                          <div className="relative">
+                            <Input
+                              type="password"
+                              placeholder="Same as above"
+                              value={passwords.confirm}
+                              onChange={e => setPasswords({ ...passwords, confirm: e.target.value })}
+                              className={`h-8 text-sm pr-8 ${passwords.confirm && passwords.new !== passwords.confirm ? 'border-destructive' : ''}`}
+                            />
+                            {passwords.confirm && (
+                              <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                                {passwords.new === passwords.confirm
+                                  ? <CheckCircle2 className="size-3.5 text-green-600" />
+                                  : <AlertCircle className="size-3.5 text-destructive" />
+                                }
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" size="sm" disabled={changingPw}>
+                          {changingPw ? <Loader2 className="size-3.5 mr-1.5 animate-spin" /> : null}
+                          Update Password
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => { setShowPwForm(false); setPasswords({ new: "", confirm: "" }) }}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                </CardContent>
+              </Card>
 
-                <div className="pt-4 border-t border-border">
-                  <Button variant="outline" className="w-full" onClick={() => toast.info("Password change is coming soon")}>
-                    Change Password
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">Session</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm">Sign out of this account</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">You'll be redirected to the login page</p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleSignOut}>
+                      <LogOut className="size-3.5 mr-1.5" />
+                      Sign Out
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
