@@ -130,7 +130,7 @@ export function DashboardContent() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/sprints">Create a Sprint</Link>
+          <Link href="/backlog">Go to Backlog</Link>
         </Button>
       </div>
     )
