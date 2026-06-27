@@ -129,7 +129,7 @@ export function BacklogContent() {
 
   // Create sprint dialog
   const [sprintOpen, setSprintOpen] = useState(false)
-  const [sprintForm, setSprintForm] = useState({ name: "", goal: "", startDate: "", endDate: "", projectId: "" })
+  const [sprintForm, setSprintForm] = useState({ name: "", goal: "", startDate: "", endDate: "", projectId: "", status: "active" })
   const [creatingSprint, setCreatingSprint] = useState(false)
 
   // ── Derived data ───────────────────────────────────────────────────────────
@@ -236,13 +236,13 @@ export function BacklogContent() {
         goal: sprintForm.goal.trim(),
         startDate: sprintForm.startDate,
         endDate: sprintForm.endDate,
-        status: "active",
+        status: sprintForm.status as any,
         committedStoryPoints: 0,
         completedStoryPoints: 0,
       })
-      toast.success(`Sprint "${sprintForm.name}" created`)
+      toast.success(`Sprint "${sprintForm.name}" created${sprintForm.status === 'active' ? ' and set as active' : ''}`)
       setSprintOpen(false)
-      setSprintForm({ name: "", goal: "", startDate: "", endDate: "", projectId: "" })
+      setSprintForm({ name: "", goal: "", startDate: "", endDate: "", projectId: "", status: "active" })
     } catch (err: any) {
       toast.error(err?.message || "Failed to create sprint")
     } finally {
@@ -647,7 +647,7 @@ export function BacklogContent() {
       </Dialog>
 
       {/* Create Sprint Dialog */}
-      <Dialog open={sprintOpen} onOpenChange={(open) => { setSprintOpen(open); if (!open) setSprintForm({ name: "", goal: "", startDate: "", endDate: "", projectId: "" }) }}>
+      <Dialog open={sprintOpen} onOpenChange={(open) => { setSprintOpen(open); if (!open) setSprintForm({ name: "", goal: "", startDate: "", endDate: "", projectId: "", status: "active" }) }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>New Sprint</DialogTitle>
@@ -703,6 +703,16 @@ export function BacklogContent() {
                 </Select>
               </div>
             )}
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select value={sprintForm.status} onValueChange={v => setSprintForm({ ...sprintForm, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active — start immediately</SelectItem>
+                  <SelectItem value="planning">Planning — not started yet</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSprintOpen(false)}>Cancel</Button>

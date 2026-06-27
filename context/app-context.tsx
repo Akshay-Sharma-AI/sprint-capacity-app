@@ -219,7 +219,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLoading(false)
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    loadData()
+
+    // Keep currentUserId in sync with Supabase auth so that
+    // after login/logout the context reflects the new user immediately.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        const uid = session?.user?.id ?? null
+        setCurrentUserId(uid)
+        // Re-load all data so workspaceId and membership are fresh
+        if (event === 'SIGNED_IN') await loadData()
+        if (event === 'SIGNED_OUT') {
+          setWorkspaceId(null)
+          setUsers([])
+          setProjects([])
+          setSprints([])
+          setTasks([])
+          setCapacities([])
+          setDailyUpdates([])
+          setActiveSprintId(null)
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [loadData])
 
   // ── Projects ──────────────────────────────────────────────────────────────
 
@@ -255,7 +280,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ── Sprints ───────────────────────────────────────────────────────────────
 
   const createSprint = useCallback(async (sprint: Omit<Sprint, "id">) => {
-    if (!workspaceId) throw new Error("You must be signed in to create a sprint")
+    if (!workspaceId || !currentUserId) throw new Error("You must be signed in to create a sprint")
     const { data, error } = await supabase.from('sprints').insert({
       workspace_id: workspaceId,
       project_id: sprint.projectId,
@@ -268,8 +293,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       completed_story_points: 0,
     }).select().single()
     if (error) throw error
-    setSprints(prev => [mapSprint(data), ...prev])
-  }, [workspaceId])
+    const mapped = mapSprint(data)
+    setSprints(prev => [mapped, ...prev])
+    // Auto-activate the new sprint if created as active
+    if (mapped.status === 'active') setActiveSprintId(mapped.id)
+  }, [workspaceId, currentUserId])
 
   const updateSprint = useCallback(async (id: string, updates: Partial<Sprint>) => {
     const { data, error } = await supabase.from('sprints').update({

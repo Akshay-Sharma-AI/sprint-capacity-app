@@ -35,6 +35,7 @@ export default function SignUpPage() {
     const result = await signUp(email, password, fullName)
     if (result.success) {
       toast.success(`Welcome, ${fullName.split(' ')[0]}! You're in.`)
+      router.refresh()
       router.push('/')
     } else {
       toast.error((result.error as any)?.message || 'Sign up failed. Try a different email.')

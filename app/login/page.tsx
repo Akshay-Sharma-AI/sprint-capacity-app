@@ -28,6 +28,7 @@ export default function LoginPage() {
     const result = await signIn(email, password)
     if (result.success) {
       toast.success('Welcome back!')
+      router.refresh()
       router.push('/')
     } else {
       toast.error('Incorrect email or password. Try the demo credentials below.')
