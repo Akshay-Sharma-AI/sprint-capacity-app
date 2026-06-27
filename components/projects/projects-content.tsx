@@ -59,6 +59,7 @@ export function ProjectsContent() {
 
   const handleCreate = async () => {
     if (!newProject.name.trim()) { toast.error("Project name is required"); return }
+    if (!currentUserId) { toast.error("Sign in to create a project"); return }
     setSaving(true)
     try {
       await createProject({
@@ -76,8 +77,8 @@ export function ProjectsContent() {
       toast.success(`Project "${newProject.name}" created`)
       setOpen(false)
       setNewProject({ name: "", description: "", leadId: "", status: "active" })
-    } catch {
-      toast.error("Failed to create project")
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to create project")
     } finally {
       setSaving(false)
     }
@@ -108,7 +109,10 @@ export function ProjectsContent() {
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">{projects.length} project{projects.length !== 1 ? 's' : ''}</span>
-          <Button size="sm" onClick={() => setOpen(true)}>
+          <Button size="sm" onClick={() => {
+            if (!currentUserId) { toast.error("Sign in to create a project"); return }
+            setOpen(true)
+          }}>
             <Plus data-icon="inline-start" />
             New Project
           </Button>

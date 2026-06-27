@@ -106,6 +106,7 @@ export function BacklogContent() {
     sprints,
     projects,
     activeSprintId,
+    currentUserId,
     createTask,
     updateTask,
     deleteTask,
@@ -165,6 +166,10 @@ export function BacklogContent() {
       toast.error("Title is required")
       return
     }
+    if (!currentUserId) {
+      toast.error("Sign in to create tasks")
+      return
+    }
     setCreating(true)
     try {
       await createTask({
@@ -189,8 +194,8 @@ export function BacklogContent() {
       toast.success(`"${form.title}" ${form.addToSprint ? "added to sprint" : "added to backlog"}`)
       setCreateOpen(false)
       setForm(defaultForm)
-    } catch {
-      toast.error("Failed to create task")
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to create task")
     } finally {
       setCreating(false)
     }
