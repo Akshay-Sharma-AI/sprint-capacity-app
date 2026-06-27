@@ -174,9 +174,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const loadData = useCallback(async () => {
     setLoading(true)
 
-    // Load current user if logged in (optional — app is publicly viewable)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) setCurrentUserId(user.id)
+    // Use getSession (reads from local storage, no network round-trip) for speed,
+    // then verify with getUser for security-sensitive reads.
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user) setCurrentUserId(session.user.id)
 
     // Get the shared workspace (first one — single-tenant team setup)
     const { data: workspaceRow } = await supabase
@@ -228,8 +229,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         const uid = session?.user?.id ?? null
         setCurrentUserId(uid)
-        // Re-load all data so workspaceId and membership are fresh
-        if (event === 'SIGNED_IN') await loadData()
+        // Reload data on any session change so workspaceId and memberships are fresh
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+          await loadData()
+        }
         if (event === 'SIGNED_OUT') {
           setWorkspaceId(null)
           setUsers([])

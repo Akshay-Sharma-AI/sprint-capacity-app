@@ -207,12 +207,12 @@ export function AppSidebar() {
               <Link
                 href="/login"
                 className={cn(
-                  "flex items-center gap-2 px-4 py-3 text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors",
+                  "flex items-center gap-2 px-4 py-3 text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors border-t border-primary/20",
                   collapsed && "justify-center px-0"
                 )}
               >
                 <LogIn className="size-4 shrink-0" />
-                {!collapsed && <span>Sign In</span>}
+                {!collapsed && <span>Sign in to create & edit</span>}
               </Link>
             )
           )}

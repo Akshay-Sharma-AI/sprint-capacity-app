@@ -49,6 +49,7 @@ import {
   InboxIcon,
 } from "lucide-react"
 import { useAppContext } from "@/context/app-context"
+import { useRouter } from "next/navigation"
 import type { TaskType, TaskPriority } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -113,6 +114,16 @@ export function BacklogContent() {
     deleteTask,
     createSprint,
   } = useAppContext()
+  const router = useRouter()
+
+  const requireAuth = () => {
+    if (!currentUserId) {
+      toast.error("Sign in to continue")
+      router.push('/login')
+      return false
+    }
+    return true
+  }
 
   const [search, setSearch] = useState("")
   const [filterType, setFilterType] = useState("all")
@@ -173,10 +184,7 @@ export function BacklogContent() {
       toast.error("Title is required")
       return
     }
-    if (!currentUserId) {
-      toast.error("Sign in to create tasks")
-      return
-    }
+    if (!requireAuth()) return
     setCreating(true)
     try {
       await createTask({
@@ -225,7 +233,7 @@ export function BacklogContent() {
   const handleCreateSprint = async () => {
     if (!sprintForm.name.trim()) { toast.error("Sprint name is required"); return }
     if (!sprintForm.startDate || !sprintForm.endDate) { toast.error("Start and end dates are required"); return }
-    if (!currentUserId) { toast.error("Sign in to create a sprint"); return }
+    if (!requireAuth()) return
     const pid = sprintForm.projectId || defaultProjectId
     if (!pid) { toast.error("Create a project first before creating a sprint"); return }
     setCreatingSprint(true)
@@ -389,14 +397,11 @@ export function BacklogContent() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => {
-                if (!currentUserId) { toast.error("Sign in to create a sprint"); return }
-                setSprintOpen(true)
-              }}>
+              <Button size="sm" variant="outline" onClick={() => { if (requireAuth()) setSprintOpen(true) }}>
                 <Zap className="size-4 mr-1" />
                 New Sprint
               </Button>
-              <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Button size="sm" onClick={() => { if (requireAuth()) setCreateOpen(true) }}>
                 <Plus className="size-4 mr-1" />
                 Create Task
               </Button>
@@ -434,7 +439,7 @@ export function BacklogContent() {
                 <p className="text-xs text-muted-foreground/70">
                   Create a sprint to start planning your team&apos;s work
                 </p>
-                <Button size="sm" variant="outline" onClick={() => setSprintOpen(true)}>
+                <Button size="sm" variant="outline" onClick={() => { if (requireAuth()) setSprintOpen(true) }}>
                   <Zap className="size-3.5 mr-1.5" />
                   Create Sprint
                 </Button>

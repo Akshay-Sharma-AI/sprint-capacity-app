@@ -39,6 +39,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { useAppContext } from "@/context/app-context"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import type { ProjectStatus } from "@/lib/mock-data"
@@ -52,14 +53,24 @@ const statusConfig: Record<ProjectStatus, { label: string; className: string }> 
 
 export function ProjectsContent() {
   const { projects, users, currentUserId, createProject, deleteProject, loading } = useAppContext()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [newProject, setNewProject] = useState({ name: "", description: "", leadId: "", status: "active" })
 
+  const requireAuth = () => {
+    if (!currentUserId) {
+      toast.error("Sign in to continue")
+      router.push('/login')
+      return false
+    }
+    return true
+  }
+
   const handleCreate = async () => {
     if (!newProject.name.trim()) { toast.error("Project name is required"); return }
-    if (!currentUserId) { toast.error("Sign in to create a project"); return }
+    if (!requireAuth()) return
     setSaving(true)
     try {
       await createProject({
@@ -109,10 +120,7 @@ export function ProjectsContent() {
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">{projects.length} project{projects.length !== 1 ? 's' : ''}</span>
-          <Button size="sm" onClick={() => {
-            if (!currentUserId) { toast.error("Sign in to create a project"); return }
-            setOpen(true)
-          }}>
+          <Button size="sm" onClick={() => { if (requireAuth()) setOpen(true) }}>
             <Plus data-icon="inline-start" />
             New Project
           </Button>
@@ -123,7 +131,7 @@ export function ProjectsContent() {
             <FolderKanban className="size-10 text-muted-foreground/40 mb-3" />
             <p className="text-sm font-medium text-muted-foreground">No projects yet</p>
             <p className="text-xs text-muted-foreground/60 mt-1">Create your first project to get started</p>
-            <Button size="sm" className="mt-4" onClick={() => setOpen(true)}>
+            <Button size="sm" className="mt-4" onClick={() => { if (requireAuth()) setOpen(true) }}>
               <Plus data-icon="inline-start" /> New Project
             </Button>
           </div>
