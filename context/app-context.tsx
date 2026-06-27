@@ -223,7 +223,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ── Projects ──────────────────────────────────────────────────────────────
 
   const createProject = useCallback(async (project: Omit<Project, "id">) => {
-    if (!workspaceId || !currentUserId) return
+    if (!workspaceId || !currentUserId) throw new Error("You must be signed in to create a project")
     const { data, error } = await supabase.from('projects').insert({
       workspace_id: workspaceId,
       name: project.name,
@@ -254,7 +254,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ── Sprints ───────────────────────────────────────────────────────────────
 
   const createSprint = useCallback(async (sprint: Omit<Sprint, "id">) => {
-    if (!workspaceId) return
+    if (!workspaceId) throw new Error("You must be signed in to create a sprint")
     const { data, error } = await supabase.from('sprints').insert({
       workspace_id: workspaceId,
       project_id: sprint.projectId,
@@ -294,7 +294,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ── Tasks ─────────────────────────────────────────────────────────────────
 
   const createTask = useCallback(async (task: Omit<Task, "id">) => {
-    if (!workspaceId || !currentUserId) return
+    if (!workspaceId || !currentUserId) throw new Error("You must be signed in to create a task")
     const { data, error } = await supabase.from('tasks').insert({
       workspace_id: workspaceId,
       project_id: task.projectId,
@@ -346,7 +346,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ── Capacities ────────────────────────────────────────────────────────────
 
   const updateCapacity = useCallback(async (userId: string, sprintId: string, updates: Partial<Capacity>) => {
-    if (!workspaceId) return
+    if (!workspaceId) throw new Error("You must be signed in to update capacity")
     const exists = capacities.some(c => c.userId === userId && c.sprintId === sprintId)
     let data: any
     let error: any
@@ -375,7 +375,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ── Daily Updates ─────────────────────────────────────────────────────────
 
   const createDailyUpdate = useCallback(async (update: Omit<DailyUpdate, "id">) => {
-    if (!workspaceId || !currentUserId || !activeSprintId) return
+    if (!workspaceId || !currentUserId || !activeSprintId) throw new Error("You must be signed in and have an active sprint to post standup")
     const { data, error } = await supabase.from('daily_updates').insert({
       workspace_id: workspaceId,
       sprint_id: activeSprintId,
