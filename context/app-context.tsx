@@ -174,20 +174,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const loadData = useCallback(async () => {
     setLoading(true)
 
-    // Use getSession (reads from local storage, no network round-trip) for speed,
-    // then verify with getUser for security-sensitive reads.
     const { data: { session } } = await supabase.auth.getSession()
-    if (session?.user) setCurrentUserId(session.user.id)
+    const uid = session?.user?.id ?? null
+    if (uid) setCurrentUserId(uid)
 
-    // Get the shared workspace (first one — single-tenant team setup)
-    const { data: workspaceRow } = await supabase
-      .from('workspaces')
-      .select('id')
-      .limit(1)
-      .single()
+    // Find workspace: prefer membership lookup (auth-safe), then fall back to direct query
+    let wid: string | null = null
+    if (uid) {
+      const { data: memberRow } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', uid)
+        .limit(1)
+        .single()
+      wid = memberRow?.workspace_id ?? null
+    }
+    if (!wid) {
+      const { data: workspaceRow } = await supabase
+        .from('workspaces')
+        .select('id')
+        .limit(1)
+        .single()
+      wid = workspaceRow?.id ?? null
+    }
 
-    if (!workspaceRow) { setLoading(false); return }
-    const wid = workspaceRow.id
+    if (!wid) { setLoading(false); return }
     setWorkspaceId(wid)
 
     const [usersRes, projectsRes, sprintsRes, tasksRes, capsRes, updatesRes] =
@@ -255,17 +266,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const { data: { session } } = await supabase.auth.getSession()
     const uid = session?.user?.id
     if (!uid) throw new Error("You must be signed in. Please log in and try again.")
-    // Fix stale state while we're here
     if (!currentUserId) setCurrentUserId(uid)
-    // Ensure workspaceId is loaded
-    let wid = workspaceId
-    if (!wid) {
-      const { data } = await supabase.from('workspaces').select('id').limit(1).single()
-      if (!data) throw new Error("No workspace found — try refreshing the page.")
-      wid = data.id
-      setWorkspaceId(wid)
+
+    // Fast path: workspaceId already in state
+    if (workspaceId) return { uid, wid: workspaceId }
+
+    // Look up via workspace_members — works even when workspaces table has restrictive RLS
+    const { data: memberRow } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', uid)
+      .limit(1)
+      .single()
+    if (memberRow?.workspace_id) {
+      setWorkspaceId(memberRow.workspace_id)
+      return { uid, wid: memberRow.workspace_id as string }
     }
-    return { uid, wid }
+
+    // Fallback: direct workspaces query (works when table has public or loose RLS)
+    const { data: wsRow } = await supabase
+      .from('workspaces')
+      .select('id')
+      .limit(1)
+      .single()
+    if (wsRow?.id) {
+      setWorkspaceId(wsRow.id)
+      return { uid, wid: wsRow.id as string }
+    }
+
+    throw new Error("No workspace found. Please sign out and sign back in.")
   }, [workspaceId, currentUserId])
 
   // ── Projects ──────────────────────────────────────────────────────────────
